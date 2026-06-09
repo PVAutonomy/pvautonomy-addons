@@ -1,6 +1,6 @@
 name: "PVAutonomy Installer / Updater"
 slug: pvautonomy_installer
-version: "0.1.0"
+version: "0.1.1"
 description: >-
   Installs and updates the PVAutonomy Ops integration into
   /config/custom_components. No GitHub account, no HACS required.

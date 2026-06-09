@@ -6,6 +6,10 @@ Installs and updates the **PVAutonomy Ops** integration into
 > **Requirement:** Home Assistant **OS** or **Supervised**. (Add-ons need the
 > Supervisor; Container/Core are not supported in this MVP.)
 
+> **Versions:** the add-on's own version (e.g. `0.1.x`) is the *installer*
+> version. The **PVAutonomy Ops integration** it installs is a separate version
+> defined by the channel manifest — currently **0.4.1**.
+
 ## What it does
 
 1. Reads a channel manifest (`stable` or `beta`) that pins an exact version,
