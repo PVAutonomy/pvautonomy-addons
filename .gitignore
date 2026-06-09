@@ -1,0 +1,5 @@
+# Local proof / test artifacts — never committed
+/test/.work/
+*.bak
+*.bak.*
+.DS_Store

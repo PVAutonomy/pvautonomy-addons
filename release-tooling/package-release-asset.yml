@@ -1,0 +1,59 @@
+# ============================================================================
+# DRAFT — this workflow belongs in repo PVAutonomy/pvautonomy-ops, at:
+#     .github/workflows/package-release-asset.yml
+#
+# It is parked here as a design draft only. Do NOT place it under this repo's
+# own .github/workflows — it would run against the wrong repository.
+# Installing it requires gshubi auth + a separate GO (no push/release here).
+#
+# Purpose: on every published release of pvautonomy-ops, build a deterministic,
+# checksummed ZIP of the integration and attach it as a release asset so the
+# installer add-on can verify and install it.
+#
+# Produces (for tag vX.Y.Z):
+#   pvautonomy_ops-X.Y.Z.zip          (contains custom_components/pvautonomy_ops/...)
+#   pvautonomy_ops-X.Y.Z.zip.sha256
+# Deterministic download URL (no redirect):
+#   https://github.com/PVAutonomy/pvautonomy-ops/releases/download/vX.Y.Z/pvautonomy_ops-X.Y.Z.zip
+#
+# After the run, update integration/stable.json in pvautonomy-addons with the
+# new version + sha256 (manual for now; can be automated as a follow-up).
+# ============================================================================
+name: Package integration release asset
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ZIP + SHA-256
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#v}"
+          zip="pvautonomy_ops-${ver}.zip"
+          # Keep the custom_components/pvautonomy_ops/ prefix == manifest root_path.
+          # Exclude caches/tests so the artifact matches the shipped surface.
+          zip -r -q "$zip" custom_components/pvautonomy_ops \
+            -x '*/__pycache__/*' -x '*/tests/*'
+          sha256sum "$zip" > "$zip.sha256"
+          echo "Built $zip"
+          cat "$zip.sha256"
+
+      - name: Upload assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#v}"
+          gh release upload "$GITHUB_REF_NAME" \
+            "pvautonomy_ops-${ver}.zip" \
+            "pvautonomy_ops-${ver}.zip.sha256" \
+            --repo "${GITHUB_REPOSITORY}" --clobber

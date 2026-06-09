@@ -1,0 +1,27 @@
+name: "PVAutonomy Installer / Updater"
+slug: pvautonomy_installer
+version: "0.1.0"
+description: >-
+  Installs and updates the PVAutonomy Ops integration into
+  /config/custom_components. No GitHub account, no HACS required.
+url: "https://github.com/PVAutonomy/pvautonomy-addons/tree/main/pvautonomy_installer"
+arch:
+  - aarch64
+  - amd64
+# Run-once installer: it does its work and then stops. It does not run on every
+# boot; the customer starts it on demand to install or to update.
+startup: once
+boot: manual
+init: false
+# Read/write access to the Home Assistant config directory so the add-on can
+# write /config/custom_components/pvautonomy_ops.
+map:
+  - type: homeassistant_config
+    read_only: false
+    path: /config
+options:
+  channel: stable
+  force_reinstall: false
+schema:
+  channel: "list(stable|beta)"
+  force_reinstall: "bool"
