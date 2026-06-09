@@ -58,6 +58,18 @@ iv() { # installed version in a config dir
   jq -er '.version' "$1/custom_components/pvautonomy_ops/manifest.json" 2>/dev/null || echo "none"
 }
 
+# plant_legacy_backup <config-dir> <version> — simulate a pre-0.1.2 in-tree
+# dot-dir backup (the HA-loader hazard this fix removes).
+plant_legacy_backup() {
+  local d="$1/custom_components/.pvautonomy_ops.bak.$2"
+  mkdir -p "$d"
+  printf '{"domain":"pvautonomy_ops","name":"PVAutonomy Ops","version":"%s"}\n' "$2" > "$d/manifest.json"
+  printf '"""legacy backup %s"""\n' "$2" > "$d/__init__.py"
+}
+
+# dotbaks <cc> — list any in-tree dot-dir backups (must always be empty post-fix).
+dotbaks() { ls -d "$1"/.pvautonomy_ops.bak.* 2>/dev/null || true; }
+
 OUT=""; RC=0
 run_installer() { # run_installer <manifest> <config-dir> [extra env=...]
   local murl="$1" cfg="$2"; shift 2
@@ -122,13 +134,14 @@ else
 fi
 
 echo
-echo "== T5: update 0.4.0 -> 0.4.1 correct sha -> installs 0.4.1 + backup kept"
+echo "== T5: update 0.4.0 -> 0.4.1 -> installs 0.4.1; backup OUTSIDE custom_components"
 run_installer "$M_041_GOOD" "$CFG"
-BK_040="$(ls -d "$CC"/.pvautonomy_ops.bak.0.4.0 2>/dev/null || true)"
-if [ "$RC" -eq 0 ] && [ "$(iv "$CFG")" = "0.4.1" ] && [ -n "$BK_040" ] && [ -d "$BK_040" ]; then
-  ok "updated to $(iv "$CFG"), backup at $(basename "$BK_040")"
+BK_SAFE="$CFG/pvautonomy_backups/pvautonomy_ops.bak.0.4.0"   # (1)+(2) safe location
+LEFT="$(dotbaks "$CC")"                                       # (1) none under custom_components
+if [ "$RC" -eq 0 ] && [ "$(iv "$CFG")" = "0.4.1" ] && [ -d "$BK_SAFE" ] && [ -z "$LEFT" ]; then
+  ok "updated to $(iv "$CFG"); backup in pvautonomy_backups/; none under custom_components"
 else
-  bad "expected 0.4.1 + backup (rc=$RC, version=$(iv "$CFG"), backup='$BK_040')"
+  bad "expected 0.4.1 + safe backup + no in-tree dotdir (rc=$RC, version=$(iv "$CFG"), safe_exists=$([ -d "$BK_SAFE" ] && echo y || echo n), in_tree='$LEFT')"
 fi
 
 echo
@@ -138,6 +151,34 @@ if [ "$RC" -ne 0 ] && echo "$OUT" | grep -q "rolled back" && [ "$(iv "$CFG")" = 
   ok "rolled back, version restored to $(iv "$CFG")"
 else
   bad "expected rollback to 0.4.1 (rc=$RC, version=$(iv "$CFG"))"
+fi
+
+echo
+echo "== T7: legacy in-tree backup is migrated out of custom_components on update"
+# Config is on 0.4.1 after T6 (forced rollback). Plant a pre-0.1.2 dot-dir backup.
+plant_legacy_backup "$CFG" 0.3.9
+run_installer "$M_042_GOOD" "$CFG"
+GONE7=1; [ -d "$CC/.pvautonomy_ops.bak.0.3.9" ] && GONE7=0   # (3) legacy dir removed from cc
+LEFT="$(dotbaks "$CC")"                                      # (3) no in-tree dotdirs at all
+if [ "$RC" -eq 0 ] && [ "$(iv "$CFG")" = "0.4.2" ] && [ "$GONE7" -eq 1 ] && [ -z "$LEFT" ] \
+   && echo "$OUT" | grep -q "found legacy custom_components backup" \
+   && echo "$OUT" | grep -q "migrated legacy backup -> .*/pvautonomy_backups/"; then
+  ok "updated to $(iv "$CFG"); legacy dotdir migrated out of custom_components"
+else
+  bad "expected legacy migrate on update (rc=$RC, version=$(iv "$CFG"), gone=$GONE7, in_tree='$LEFT')"
+fi
+
+echo
+echo "== T8: legacy cleanup runs even when already up to date (installed==target, force=0)"
+plant_legacy_backup "$CFG" 0.3.8
+run_installer "$M_042_GOOD" "$CFG"      # 0.4.2 already installed, force=0 -> early return
+GONE8=1; [ -d "$CC/.pvautonomy_ops.bak.0.3.8" ] && GONE8=0   # (4) cleanup despite early return
+LEFT="$(dotbaks "$CC")"
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "already installed" && [ "$GONE8" -eq 1 ] \
+   && [ -z "$LEFT" ] && echo "$OUT" | grep -q "found legacy custom_components backup"; then
+  ok "already-installed run still cleaned the legacy dotdir"
+else
+  bad "expected legacy cleanup on already-installed run (rc=$RC, gone=$GONE8, in_tree='$LEFT')"
 fi
 
 echo

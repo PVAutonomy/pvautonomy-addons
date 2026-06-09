@@ -48,7 +48,12 @@ Installs and updates the **PVAutonomy Ops** integration into
 - HTTPS-only downloads; plain `http://` is refused.
 - SHA‑256 verified **before** any file is written.
 - Automatic backup + rollback around every change (last 2 backups kept under
-  `/config/custom_components/.pvautonomy_ops.bak.<version>`).
+  `/config/pvautonomy_backups/pvautonomy_ops.bak.<version>`). Backups live
+  **outside** `custom_components/` on purpose: Home Assistant's loader scans
+  every sub-directory there (including dot-prefixed ones), so an in-tree backup
+  would collide with the loader and break the integration import. Any legacy
+  `custom_components/.pvautonomy_ops.bak.*` from older installer versions is
+  migrated to the safe location automatically on the next run.
 - No secrets, no account, no customer data leaves the device.
 - Failures are fatal with a clear message — never "success with warnings".
 
