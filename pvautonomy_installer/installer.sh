@@ -16,6 +16,15 @@
 #
 # Exit codes: 0 = installed or already up to date; non-zero = fatal (no
 # "success with warnings"). Any failure after the backup step rolls back.
+#
+# Backups live OUTSIDE custom_components (in $PVA_CONFIG_DIR/pvautonomy_backups).
+# Home Assistant's loader scans every subdirectory of custom_components/ that has
+# a manifest.json — including dot-prefixed ones — and builds the import path as
+# "custom_components.<dirname>". A backup placed inside custom_components as
+# ".pvautonomy_ops.bak.<ver>" therefore yields the import path
+# "custom_components..pvautonomy_ops.bak.<ver>" (empty segment) and crashes setup
+# with: No module named 'custom_components.'. Keeping backups outside the scanned
+# tree avoids that loader collision entirely.
 
 set -euo pipefail
 
@@ -23,6 +32,8 @@ PVA_CONFIG_DIR="${PVA_CONFIG_DIR:-/config}"
 PVA_FORCE="${PVA_FORCE:-0}"
 COMPONENT="pvautonomy_ops"
 KEEP_BACKUPS=2
+# Backup root: a sibling of custom_components, never scanned by the HA loader.
+BACKUP_RELDIR="pvautonomy_backups"
 
 # File-scope work dir so the EXIT trap can see it after main() returns.
 work=""
@@ -81,8 +92,8 @@ verify_install() {
 }
 
 prune_backups() {
-  local cc="$1" pattern
-  pattern="$cc/.${COMPONENT}.bak."
+  local bkroot="$1" pattern
+  pattern="$bkroot/${COMPONENT}.bak."
   local -a backups=()
   local f
   # shellcheck disable=SC2012  # names are controlled; ls -t gives newest-first by mtime
@@ -96,6 +107,36 @@ prune_backups() {
       rm -rf "$f"
     fi
   done
+}
+
+# legacy_backup_cleanup <cc> <bkroot> — migrate/remove pre-0.1.2 backups that
+# were written as dot-dirs INSIDE custom_components (the HA-loader hazard). Runs
+# on every installer invocation, even when already up to date. Each legacy dir
+# is moved into the safe backup root (leading dot stripped from the name); if a
+# same-named safe backup already exists, the legacy copy is removed instead.
+legacy_backup_cleanup() {
+  local cc="$1" bkroot="$2" f base target found=0
+  # Pattern starts with a literal dot, so it matches hidden dirs without dotglob.
+  for f in "$cc/.${COMPONENT}.bak."*; do
+    [ -e "$f" ] || continue          # no match -> literal pattern, skip
+    found=$((found + 1))
+    base="$(basename "$f")"          # .pvautonomy_ops.bak.<ver>[.<pid>]
+    base="${base#.}"                 # -> pvautonomy_ops.bak.<ver>[.<pid>]
+    log "found legacy custom_components backup: $f"
+    mkdir -p "$bkroot"
+    target="$bkroot/$base"
+    if [ -e "$target" ]; then
+      rm -rf "$f"
+      log "removed legacy backup (safe copy already present): $f"
+    elif mv "$f" "$target" 2>/dev/null; then
+      log "migrated legacy backup -> $target"
+    else
+      rm -rf "$f"
+      log "removed legacy backup (migration failed): $f"
+    fi
+  done
+  [ "$found" -gt 0 ] && prune_backups "$bkroot"
+  return 0
 }
 
 print_restart_notice() {
@@ -132,6 +173,15 @@ main() {
   sha="$(read_json "$work/manifest.json" '.artifact.sha256')"          || fatal "manifest: missing .artifact.sha256"
   root_path="$(read_json "$work/manifest.json" '.artifact.root_path')" || fatal "manifest: missing .artifact.root_path"
 
+  local cc="$PVA_CONFIG_DIR/custom_components"
+  local dest="$cc/$COMPONENT"
+  local bkroot="$PVA_CONFIG_DIR/$BACKUP_RELDIR"
+  log "backup location = $bkroot"
+
+  # Always migrate/remove legacy in-tree dot-dir backups first — even when we are
+  # already up to date and will return early below.
+  legacy_backup_cleanup "$cc" "$bkroot"
+
   local current
   current="$(installed_version)"
   log "installed=$current target=$target force=$PVA_FORCE"
@@ -157,14 +207,14 @@ main() {
   [ -d "$src_dir" ]                  || fatal "artifact missing expected path: $root_path"
   [ -f "$src_dir/manifest.json" ]    || fatal "artifact missing manifest.json"
 
-  local cc="$PVA_CONFIG_DIR/custom_components"
-  local dest="$cc/$COMPONENT"
   mkdir -p "$cc"
 
-  # Back up an existing install before we touch it.
+  # Back up an existing install before we touch it — OUTSIDE custom_components so
+  # the HA loader never enumerates it as an integration (see header note).
   local backup=""
   if [ -d "$dest" ]; then
-    backup="$cc/.${COMPONENT}.bak.${current}.$$"
+    mkdir -p "$bkroot"
+    backup="$bkroot/.${COMPONENT}.bak.${current}.$$"
     log "backing up existing $current -> $backup"
     mv "$dest" "$backup" || fatal "backup move failed"
   fi
@@ -184,10 +234,10 @@ main() {
     fatal "post-install verification failed — removed broken install."
   fi
 
-  # Success. Give the backup a stable name and prune old ones.
+  # Success. Give the backup a stable name and prune old ones (in the safe root).
   if [ -n "$backup" ]; then
-    mv "$backup" "$cc/.${COMPONENT}.bak.${current}" 2>/dev/null || true
-    prune_backups "$cc"
+    mv "$backup" "$bkroot/${COMPONENT}.bak.${current}" 2>/dev/null || true
+    prune_backups "$bkroot"
   fi
 
   log "PVAutonomy Ops $target installed at $dest"

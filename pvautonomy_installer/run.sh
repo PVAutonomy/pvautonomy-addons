@@ -16,7 +16,7 @@ set -euo pipefail
 # Keep in sync with config.yaml `version:`. This is the installer add-on
 # version shown in the log; the PVAutonomy Ops integration version it installs
 # is defined by the selected channel manifest.
-ADDON_VERSION="0.1.1"
+ADDON_VERSION="0.1.2"
 
 # Supervisor writes the resolved add-on options here. Overridable for tests.
 OPTIONS_FILE="${PVA_OPTIONS_FILE:-/data/options.json}"
