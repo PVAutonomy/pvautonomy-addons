@@ -9,6 +9,9 @@
 #                                 local path / file:// for the test harness)
 #   PVA_CONFIG_DIR     default /config   Home Assistant config directory
 #   PVA_FORCE          default 0   reinstall even if installed version == target
+#   PVA_ALLOW_WITH_HACS default 0  proceed even if HACS already manages this
+#                                 integration (override the canonical-path guard;
+#                                 see issue config #58)
 #
 # Test-only hook:
 #   PVA_TEST_FORCE_SANITY_FAIL=1  force the post-install sanity check to fail,
@@ -30,6 +33,7 @@ set -euo pipefail
 
 PVA_CONFIG_DIR="${PVA_CONFIG_DIR:-/config}"
 PVA_FORCE="${PVA_FORCE:-0}"
+PVA_ALLOW_WITH_HACS="${PVA_ALLOW_WITH_HACS:-0}"
 COMPONENT="pvautonomy_ops"
 KEEP_BACKUPS=2
 # Backup root: a sibling of custom_components, never scanned by the HA loader.
@@ -78,6 +82,30 @@ installed_version() {
   else
     echo "none"
   fi
+}
+
+# hacs_manages_component — returns 0 (true) if HACS already manages (has
+# installed) this integration on this system. Read from HACS's own storage so the
+# add-on never dual-manages the same files as HACS: issue config #58 makes HACS
+# the canonical install/update path, and running both lets their version trackers
+# diverge into a "split-brain". Recurses the HACS store and matches the repo
+# full_name with an installed flag; tolerant of HACS storage-schema differences
+# (modern hacs.data vs. legacy hacs.repositories). Unparseable/missing stores ->
+# treated as "not managed" so a system without HACS installs normally.
+hacs_manages_component() {
+  local f
+  for f in "$PVA_CONFIG_DIR/.storage/hacs.data" "$PVA_CONFIG_DIR/.storage/hacs.repositories"; do
+    [ -f "$f" ] || continue
+    if jq -e '
+          [ .. | objects
+            | select((.full_name? // "" | tostring | ascii_downcase) == "pvautonomy/pvautonomy-ops")
+            | select(.installed? == true) ]
+          | length > 0
+        ' "$f" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 verify_install() {
@@ -161,6 +189,20 @@ main() {
   [ -n "${PVA_MANIFEST_URL:-}" ] || fatal "PVA_MANIFEST_URL not set"
   command -v jq    >/dev/null 2>&1 || fatal "jq not available"
   command -v unzip >/dev/null 2>&1 || fatal "unzip not available"
+
+  # Canonical-path guard (issue config #58). HACS is the canonical install/update
+  # path for this integration; if HACS already manages it on this system, refuse
+  # before doing anything — running the add-on too would diverge the two version
+  # trackers (split-brain). The genuine no-HACS-edge / firmware-bootstrap case can
+  # override with allow_with_hacs. This runs before any side effect (no manifest
+  # fetch, no legacy backup migration, no writes).
+  if hacs_manages_component; then
+    if [ "$PVA_ALLOW_WITH_HACS" = "1" ]; then
+      log "WARN: HACS manages PVAutonomy Ops on this system; proceeding anyway (allow_with_hacs=1). You are responsible for keeping HACS and this add-on consistent."
+    else
+      fatal "HACS already manages PVAutonomy Ops on this system. HACS is the canonical install/update path — update the integration via HACS, not this add-on (this add-on is for systems WITHOUT HACS). No changes were made. To override intentionally, set the add-on option 'allow_with_hacs: true'. See https://github.com/PVAutonomy/pvautonomy-config/issues/58"
+    fi
+  fi
 
   work="$(mktemp -d)"
 
