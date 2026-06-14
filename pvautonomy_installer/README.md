@@ -10,6 +10,9 @@ Installs and updates the **PVAutonomy Ops** integration into
 > directly and does not update HACS's version metadata, so the two diverge (a
 > "split-brain"). See
 > [PVAutonomy/pvautonomy-config#58](https://github.com/PVAutonomy/pvautonomy-config/issues/58).
+> Starting it on such a system **fails closed** by default; to override
+> intentionally (genuine no-HACS-edge / firmware-bootstrap), set the
+> `allow_with_hacs` option (see [Options](#options) below).
 
 > **Requirement:** Home Assistant **OS** or **Supervised**. (Add-ons need the
 > Supervisor; Container/Core are not supported in this MVP.)
@@ -36,6 +39,7 @@ Installs and updates the **PVAutonomy Ops** integration into
 |--------|---------|---------|
 | `channel` | `stable` | Which channel manifest to use (`stable` or `beta`). |
 | `force_reinstall` | `false` | Reinstall even if the installed version already matches. |
+| `allow_with_hacs` | `false` | Proceed even when HACS already manages this integration (overrides the canonical-path guard). Leave `false` on any system with HACS; set `true` only for genuine no-HACS-edge / firmware-bootstrap use — see the **Role** note above. |
 
 ## Customer flow
 
