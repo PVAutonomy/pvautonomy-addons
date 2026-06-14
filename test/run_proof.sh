@@ -182,6 +182,38 @@ else
 fi
 
 echo
+echo "== T9: HACS-managed integration -> installer refuses by default, allows with override (config #58)"
+# T9a: HACS store marks PVAutonomy Ops installed -> fail-closed, nothing written.
+CFG_H="$WORK/config-hacs"; rm -rf "$CFG_H"; mkdir -p "$CFG_H/.storage"
+cat > "$CFG_H/.storage/hacs.data" <<'JSON'
+{"version":"2.0.0","repositories":{"1296265":{"full_name":"PVAutonomy/pvautonomy-ops","installed":true,"installed_version":"0.4.10"}}}
+JSON
+run_installer "$M_040_GOOD" "$CFG_H"
+if [ "$RC" -ne 0 ] && echo "$OUT" | grep -q "HACS already manages" && [ ! -d "$CFG_H/custom_components/pvautonomy_ops" ]; then
+  ok "refused (rc=$RC), no install while HACS manages the integration"
+else
+  bad "expected fail-closed with no install (rc=$RC, version=$(iv "$CFG_H"))"
+fi
+# T9b: explicit override -> proceeds and installs.
+run_installer "$M_040_GOOD" "$CFG_H" PVA_ALLOW_WITH_HACS=1
+if [ "$RC" -eq 0 ] && [ "$(iv "$CFG_H")" = "0.4.0" ] && echo "$OUT" | grep -q "proceeding anyway"; then
+  ok "override (allow_with_hacs=1) installs $(iv "$CFG_H")"
+else
+  bad "expected override install 0.4.0 (rc=$RC, version=$(iv "$CFG_H"))"
+fi
+# T9c: HACS present but managing a DIFFERENT repo -> no false-positive block.
+CFG_O="$WORK/config-hacs-other"; rm -rf "$CFG_O"; mkdir -p "$CFG_O/.storage"
+cat > "$CFG_O/.storage/hacs.data" <<'JSON'
+{"version":"2.0.0","repositories":{"999":{"full_name":"some/other-repo","installed":true,"installed_version":"1.0.0"}}}
+JSON
+run_installer "$M_040_GOOD" "$CFG_O"
+if [ "$RC" -eq 0 ] && [ "$(iv "$CFG_O")" = "0.4.0" ]; then
+  ok "no false-positive block when HACS manages a different repo"
+else
+  bad "expected normal install when HACS does not manage pvautonomy_ops (rc=$RC, version=$(iv "$CFG_O"))"
+fi
+
+echo
 echo "============================================================"
 echo "  RESULT: $PASS passed, $FAIL failed"
 echo "============================================================"

@@ -16,18 +16,23 @@ set -euo pipefail
 # Keep in sync with config.yaml `version:`. This is the installer add-on
 # version shown in the log; the PVAutonomy Ops integration version it installs
 # is defined by the selected channel manifest.
-ADDON_VERSION="0.1.2"
+ADDON_VERSION="0.1.3"
 
 # Supervisor writes the resolved add-on options here. Overridable for tests.
 OPTIONS_FILE="${PVA_OPTIONS_FILE:-/data/options.json}"
 
 CHANNEL="stable"
 FORCE="0"
+ALLOW_WITH_HACS="0"
 if [ -f "$OPTIONS_FILE" ] && command -v jq >/dev/null 2>&1; then
   CHANNEL="$(jq -r '.channel // "stable"' "$OPTIONS_FILE" 2>/dev/null || echo stable)"
   case "$(jq -r '.force_reinstall // false' "$OPTIONS_FILE" 2>/dev/null)" in
     true | 1 | yes) FORCE="1" ;;
     *) FORCE="0" ;;
+  esac
+  case "$(jq -r '.allow_with_hacs // false' "$OPTIONS_FILE" 2>/dev/null)" in
+    true | 1 | yes) ALLOW_WITH_HACS="1" ;;
+    *) ALLOW_WITH_HACS="0" ;;
   esac
 fi
 
@@ -43,12 +48,13 @@ esac
 BASE_URL="https://raw.githubusercontent.com/PVAutonomy/pvautonomy-addons/main/integration"
 
 echo "[pva-installer] PVAutonomy Installer / Updater v${ADDON_VERSION}"
-echo "[pva-installer] channel=${CHANNEL}  force_reinstall=${FORCE}"
+echo "[pva-installer] channel=${CHANNEL}  force_reinstall=${FORCE}  allow_with_hacs=${ALLOW_WITH_HACS}"
 echo "[pva-installer] starting installer.sh"
 
 export PVA_MANIFEST_URL="${PVA_MANIFEST_URL:-${BASE_URL}/${CHANNEL}.json}"
 export PVA_CONFIG_DIR="${PVA_CONFIG_DIR:-/config}"
 export PVA_FORCE="$FORCE"
+export PVA_ALLOW_WITH_HACS="$ALLOW_WITH_HACS"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 exec bash "${PVA_INSTALLER:-$HERE/installer.sh}"
