@@ -4,6 +4,15 @@ Home Assistant **add-on repository** for PVAutonomy. It provides a
 customer-friendly install/update path for the PVAutonomy Ops integration that
 needs **no GitHub account and no HACS**.
 
+> **Use this _or_ HACS for the integration — not both.** HACS is the
+> **canonical** install/update path for PVAutonomy Ops. This add-on is the
+> alternative for systems **without** HACS. Do not run both for the same
+> integration on one system: the add-on writes files directly and does **not**
+> touch HACS's version metadata, so the two version trackers diverge (a
+> "split-brain" — HACS shows one version while the files on disk are another).
+> See
+> [PVAutonomy/pvautonomy-config#58](https://github.com/PVAutonomy/pvautonomy-config/issues/58).
+
 > **Requirement:** Home Assistant **OS** or **Supervised** (the Supervisor is
 > required to run add-ons). Home Assistant **Container / Core** are not
 > supported by this path in the MVP — they have no add-on store.

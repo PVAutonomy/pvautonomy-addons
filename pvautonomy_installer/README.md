@@ -3,12 +3,21 @@
 Installs and updates the **PVAutonomy Ops** integration into
 `/config/custom_components/pvautonomy_ops` — **no GitHub account, no HACS**.
 
+> **Role — no-HACS path only.** HACS is the **canonical** install/update path
+> for PVAutonomy Ops. Use this add-on **only** on systems without HACS (or for
+> firmware-bootstrap / no-HACS-edge). Do **not** run it for the integration on a
+> system where HACS already manages PVAutonomy Ops: the add-on writes files
+> directly and does not update HACS's version metadata, so the two diverge (a
+> "split-brain"). See
+> [PVAutonomy/pvautonomy-config#58](https://github.com/PVAutonomy/pvautonomy-config/issues/58).
+
 > **Requirement:** Home Assistant **OS** or **Supervised**. (Add-ons need the
 > Supervisor; Container/Core are not supported in this MVP.)
 
 > **Versions:** the add-on's own version (e.g. `0.1.x`) is the *installer*
 > version. The **PVAutonomy Ops integration** it installs is a separate version
-> defined by the channel manifest — currently **0.4.1**.
+> defined by the active channel manifest (`integration/stable.json` /
+> `integration/beta.json`).
 
 ## What it does
 
