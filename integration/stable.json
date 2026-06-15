@@ -2,12 +2,12 @@
   "schema": 1,
   "integration": "pvautonomy_ops",
   "channel": "stable",
-  "version": "0.4.10",
+  "version": "0.4.11",
   "min_homeassistant": "2024.1.0",
   "artifact": {
-    "url": "https://github.com/PVAutonomy/pvautonomy-ops/releases/download/v0.4.10/pvautonomy_ops-0.4.10.zip",
-    "sha256": "da1164beaeb51dcd6f60682e2d7bef0cc6d58d95eb64282efdb970c8fa74aac6",
+    "url": "https://github.com/PVAutonomy/pvautonomy-ops/releases/download/v0.4.11/pvautonomy_ops-0.4.11.zip",
+    "sha256": "09b8ff41e6b8c716b6600e6b951eca1947fb39958e41104fbe681430d236c4c5",
     "root_path": "custom_components/pvautonomy_ops"
   },
-  "release_notes": "https://github.com/PVAutonomy/pvautonomy-ops/releases/tag/v0.4.10"
+  "release_notes": "https://github.com/PVAutonomy/pvautonomy-ops/releases/tag/v0.4.11"
 }
